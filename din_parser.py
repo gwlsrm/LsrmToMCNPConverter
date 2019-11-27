@@ -27,7 +27,7 @@ class Dimensions:
         self.crystal_hole_bottom_dl = 0
         self.crystal_hole_side_dl = 0
         self.crystal_side_cladding_thickness = 0
-        self.crystal_distance = 0
+        self.cap_to_crystal_distance = 0
         self.detector_cap_diameter = 0
         self.detector_cap_front_thickness = 0
         self.detector_cap_side_thickness = 0
@@ -47,7 +47,7 @@ class Dimensions:
                 "CrystalHoleBottomDeadLayer=" + str(self.crystal_hole_bottom_dl) + '\n' +
                 "CrystalHoleSideDeadLayer=" + str(self.crystal_hole_side_dl) + '\n' +
                 "CrystalSideCladdingThickness=" + str(self.crystal_side_cladding_thickness) + '\n' +
-                "CapToCrystalDistance=" + str(self.crystal_distance) + '\n' +
+                "CapToCrystalDistance=" + str(self.cap_to_crystal_distance) + '\n' +
                 "DetectorCapDiameter=" + str(self.detector_cap_diameter) + '\n' +
                 "DetectorCapFrontThickness=" + str(self.detector_cap_front_thickness) + '\n' +
                 "DetectorCapSideThickness=" + str(self.detector_cap_side_thickness) + '\n' +
@@ -69,7 +69,7 @@ class Dimensions:
         res.crystal_hole_side_dl = get_float_from_cm_str(parameters["DC_CrystalHoleSideDeadLayer"])
         res.crystal_side_cladding_thickness = get_float_from_cm_str(
             parameters["DC_CrystalSideCladdingThickness"])
-        res.crystal_distance = get_float_from_cm_str(parameters["DC_CapToCrystalDistance"])
+        res.cap_to_crystal_distance = get_float_from_cm_str(parameters["DC_CapToCrystalDistance"])
         res.detector_cap_diameter = get_float_from_cm_str(parameters["DC_DetectorCapDiameter"])
         res.detector_cap_front_thickness = get_float_from_cm_str(parameters["DC_DetectorCapFrontThickness"])
         res.detector_cap_side_thickness = get_float_from_cm_str(parameters["DC_DetectorCapSideThickness"])
@@ -139,7 +139,7 @@ class PPDDetector:
         res = PPDDetector()
         res.dimensions = Dimensions.parse_dimensions(parameters)
         res.materials["Crystal"] = Material.parse_material(parameters, "Crystal")
-        res.materials["CrystalSide"] = Material.parse_material(parameters, "CrystalSideCladding")
+        res.materials["CrystalSideCladding"] = Material.parse_material(parameters, "CrystalSideCladding")
         res.materials["CrystalMounting"] = Material.parse_material(parameters, "CrystalMounting")
         res.materials["DetectorCap"] = Material.parse_material(parameters, "DetectorCap")
         res.materials["Vacuum"] = Material.parse_material(parameters, "Vacuum")
