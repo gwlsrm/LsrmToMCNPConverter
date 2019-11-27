@@ -3,6 +3,7 @@
 """
 
 import din_parser
+from mcnpinparser import *
 
 SOURCE_DIST = 10
 ENERGY = 1
@@ -93,7 +94,50 @@ def form_mcnp_file(filename, det):
         # history number (counts)
         f.write("NPS   100000\n")
 
+def mcnp_add_det(mcnp, det):
+    # add planes
+    thick = det.dimensions.detector_cap_back_thickness
+    mcnp.surfaces.append(Surface(1, "PZ", thick))
+    thick += det.dimensions.detector_mounting_thickness
+    mcnp.surfaces.append(Surface(2, "PZ", thick))
+    mcnp.surfaces.append(Surface(3, "PZ", thick + det.dimensions.crystal_back_dl))
+    mcnp.surfaces.append(Surface(4, "PZ", thick + det.dimensions.crystal_hole_height))
+    mcnp.surfaces.append(Surface(5, "PZ", thick + det.dimensions.crystal_hole_height + det.dimensions.crystal_hole_bottom_dl))
+    thick += det.dimensions.crystal_height
+    mcnp.surfaces.append(Surface(6, "PZ", thick - det.dimensions.crystal_front_dl))
+    mcnp.surfaces.append(Surface(7, "PZ", thick))
+    thick += det.dimensions.cap_to_crystal_distance
+    mcnp.surfaces.append(Surface(8, "PZ", thick))
+    thick += det.dimensions.detector_cap_front_thickness
+    mcnp.surfaces.append(Surface(9, "PZ", thick))
+    # add cylinders
+    radius = det.dimensions.crystal_hole_diameter / 2.0
+    mcnp.surfaces.append(Surface(10, "CZ", radius))
+    mcnp.surfaces.append(Surface(11, "CZ", radius + det.dimensions.crystal_hole_side_dl))
+    radius = det.dimensions.crystal_diameter / 2.0
+    mcnp.surfaces.append(Surface(12, "CZ", radius - det.dimensions.crystal_side_dl))
+    mcnp.surfaces.append(Surface(13, "CZ", radius))
+    mcnp.surfaces.append(Surface(14, "CZ", radius + det.dimensions.crystal_side_cladding_thickness))
+    radius = det.dimensions.detector_cap_diameter / 2.0
+    mcnp.surfaces.append(Surface(15, "CZ", radius - det.dimensions.detector_cap_side_thickness))
+    mcnp.surfaces.append(Surface(16, "CZ", radius))
+    # add cells
+    rho_cryst = det.materials["Crystal"].rho
+    rho_cr_clad = det.materials["CrystalSideCladding"].rho
+    rho_vacuum = det.materials["Vacuum"].rho
+    rho_cr_mount = det.materials["CrystalMounting"].rho
+    rho_det_cap = det.materials["DetectorCap"].rho
+    mcnp.cells.append(Cell(1, 1, rho_cryst, "3 -6 -12 ( 5 : 11 )"))
+    mcnp.cells.append(Cell(2, 1, rho_cryst, "2 -7 -13 ( 12 : 6 : ( -3 11 ))"))  # deadlayer 1
+    mcnp.cells.append(Cell(3, 1, rho_cryst, "-11 -5 2 ( 10 : 4 )"))  # deadlayer 2
+    mcnp.cells.append(Cell(4, 2, rho_cr_clad, "13 -14 -7  2"))  # crystal cladding
+    mcnp.cells.append(Cell(5, 3, rho_vacuum, "-4 -10  2"))  # hole
+    mcnp.cells.append(Cell(6, 3, rho_vacuum, "1 -8 -15 ( 14 : 7 )"))  # vacuum chamber
+    mcnp.cells.append(Cell(7, 4, rho_cr_mount, "1 -2 -14"))  # Detector mounting
+    mcnp.cells.append(Cell(8, 5, rho_det_cap, "18 -16 -9 ( -1 : 15 : 8 )"))  # Detector cap
 
+def mcnp_add_source(mcnp, source, det_height):
+    pass
 
 if __name__ == "__main__":
     detector = din_parser.PPDDetector.parse_from_file("Gem15P4-70_51-TP32799B_UVT_tape4.din")

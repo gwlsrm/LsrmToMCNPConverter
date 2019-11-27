@@ -145,6 +145,11 @@ class PPDDetector:
         res.materials["Vacuum"] = Material.parse_material(parameters, "Vacuum")
         return res
 
+    def get_height(self):
+        return self.dimensions.detector_cap_back_thickness + self.dimensions.detector_mounting_thickness + \
+               self.dimensions.crystal_height + self.dimensions.cap_to_crystal_distance + \
+               self.dimensions.detector_cap_front_thickness
+
 
 if __name__ == "__main__":
     detector = PPDDetector.parse_from_file("Gem15P4-70_51-TP32799B_UVT_tape4.din")
