@@ -15,7 +15,7 @@ def get_float_from_cm_str(cm_str):
     words = cm_str.split()
     return float(words[0])
 
-class Dimensions:
+class HPGeDimensions:
     def __init__(self):
         self.crystal_diameter = 0
         self.crystal_height = 0
@@ -57,7 +57,7 @@ class Dimensions:
 
     @staticmethod
     def parse_dimensions(parameters):
-        res = Dimensions()
+        res = HPGeDimensions()
         res.crystal_diameter = get_float_from_cm_str(parameters["DC_CrystalDiameter"])
         res.crystal_height = get_float_from_cm_str(parameters["DC_CrystalHeight"])
         res.crystal_hole_diameter = get_float_from_cm_str(parameters["DC_CrystalHoleDiameter"])
@@ -122,13 +122,13 @@ class Material:
 class PPDDetector:
     def __init__(self):
         # dimensions
-        self.dimensions = Dimensions()
+        self.dimensions = HPGeDimensions()
         # materials
         self.materials = {}
 
     def __repr__(self):
         res = '\n'.join(k + str(v) for k,v in self.materials.items())
-        res = "Detector" + str(self.dimensions) + res
+        res = "HPGeDetector" + str(self.dimensions) + res
         return res
 
     @staticmethod
@@ -137,7 +137,7 @@ class PPDDetector:
         if "DetectorType" not in parameters or parameters["DetectorType"] != "COAXIAL":
             return None
         res = PPDDetector()
-        res.dimensions = Dimensions.parse_dimensions(parameters)
+        res.dimensions = HPGeDimensions.parse_dimensions(parameters)
         res.materials["Crystal"] = Material.parse_material(parameters, "Crystal")
         res.materials["CrystalSideCladding"] = Material.parse_material(parameters, "CrystalSideCladding")
         res.materials["CrystalMounting"] = Material.parse_material(parameters, "CrystalMounting")
@@ -150,6 +150,26 @@ class PPDDetector:
                self.dimensions.crystal_height + self.dimensions.cap_to_crystal_distance + \
                self.dimensions.detector_cap_front_thickness
 
+    def get_radius(self):
+        return self.dimensions.detector_cap_diameter / 2
+
+    def set_top_surf_num(self, top_surf_num):
+        self.top_surf_num = top_surf_num
+
+    def set_cyl_surf_num(self, cyl_surf_num):
+        self.cyl_surf_num = cyl_surf_num
+
+    def set_bottom_surf_num(self, bottom_surf_num):
+        self.bottom_surf_num = bottom_surf_num
+
+    def get_top_surf_num(self):
+        return self.top_surf_num
+
+    def get_cyl_surf_num(self):
+        return self.cyl_surf_num
+
+    def get_bottom_surf_num(self):
+        return self.bottom_surf_num
 
 if __name__ == "__main__":
     detector = PPDDetector.parse_from_file("Gem15P4-70_51-TP32799B_UVT_tape4.din")
