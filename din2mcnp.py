@@ -97,7 +97,7 @@ def form_mcnp_file(filename, det):
         # history number (counts)
         f.write("NPS   100000\n")
 
-def mcnp_add_det(mcnp, det):
+def mcnp_add_hpge_det(mcnp, det):
     # add planes
     thick = det.dimensions.detector_cap_back_thickness
     mcnp.add_surface(1, "PZ", thick)
@@ -149,6 +149,53 @@ def mcnp_add_det(mcnp, det):
     mcnp.add_material(4, det.materials["CrystalMounting"].elements)
     mcnp.add_material(5, det.materials["DetectorCap"].elements)
 
+def mcnp_add_scint_det(mcnp, det):
+    # add planes
+    thick = det.dimensions.det_mount
+    mcnp.add_surface(1, "PZ", thick)
+    thick += det.dimensions.crystal_height
+    mcnp.add_surface(2, "PZ", thick)
+    thick += det.dimensions.crystal_front_reflector
+    mcnp.add_surface(3, "PZ", thick)
+    thick += det.dimensions.crystal_front_cladding
+    mcnp.add_surface(4, "PZ", thick)
+    thick += det.dimensions.det_front_pack
+    mcnp.add_surface(5, "PZ", thick)
+    thick += det.dimensions.det_front_cap
+    mcnp.add_surface(6, "PZ", thick)
+    # add cylinders
+    radius = det.dimensions.crystal_diameter / 2.0
+    mcnp.add_surface(7, "CZ", radius)
+    radius += det.dimensions.crystal_side_reflector
+    mcnp.add_surface(8, "CZ", radius)
+    radius += det.dimensions.crystal_side_cladding
+    mcnp.add_surface(9, "CZ", radius)
+    radius += det.dimensions.det_side_pack
+    mcnp.add_surface(10, "CZ", radius)
+    radius += det.dimensions.det_side_cap
+    mcnp.add_surface(11, "CZ", radius)
+    mcnp.add_surface(12, "PZ", 0)
+    det.set_top_surf_num(6)
+    det.set_cyl_surf_num(11)
+    det.set_bottom_surf_num(12)
+    # add cells
+    rho_cryst = det.materials["Crystal"].rho
+    rho_cr_clad = det.materials["CrystalCladding"].rho
+    rho_reflector = det.materials["CrystalReflector"].rho
+    rho_det_pack = det.materials["DetectorPackaging"].rho
+    rho_det_cap = det.materials["DetectorCap"].rho
+    mcnp.add_cell(1, 1, rho_cryst, "1 -2 -7")   # Crystal (Sensitive volume (always the first))
+    mcnp.add_cell(2, 1, rho_reflector, "1 -3 -8 ( 2 : 7 )")  # Reflector
+    mcnp.add_cell(3, 1, rho_cr_clad, "1 -4 -9 ( 3 : 8 )")  # Crystal cladding
+    mcnp.add_cell(4, 2, rho_det_pack, "1 -5 -10 ( 4 : 9 )")  # Packaging
+    mcnp.add_cell(5, 3, rho_det_cap, "12 -6 -11 ( -1 : 5 : 10 )")  # Cap
+    # add materials
+    mcnp.add_material(1, det.materials["Crystal"].elements)
+    mcnp.add_material(2, det.materials["CrystalCladding"].elements)
+    mcnp.add_material(3, det.materials["CrystalReflector"].elements)
+    mcnp.add_material(4, det.materials["DetectorPackaging"].elements)
+    mcnp.add_material(5, det.materials["DetectorCap"].elements)
+
 
 def mcnp_add_source(mcnp, source, det):
     # surfaces
@@ -163,19 +210,32 @@ def mcnp_add_source(mcnp, source, det):
     # universe
     mcnp.add_cell(cn+1, 0, 0, "-%d : %d : %d" % (det.get_bottom_surf_num(), det.get_cyl_surf_num(), sn))
 
-
-if __name__ == "__main__":
-    detector = din_parser.PPDDetector.parse_from_file("mcnp_examples/Gem15P4-70_51-TP32799B_UVT_tape4.din")
-    source = sin_parser.PointSource.parse_from_file("mcnp_examples/Point-10cm.sin")
-    print(detector)
-    form_mcnp_file("mcnp_examples/PPD_in", detector)
-    mcnp = McnpTask("COAXIAL")
-    mcnp_add_det(mcnp, detector)
-    mcnp_add_source(mcnp, source, detector)
-    cell_imp = [1] * (len(mcnp.cells)-1)
+def mcnp_add_calc_params(mcnp, detector, source):
+    cell_imp = [1] * (len(mcnp.cells) - 1)
     cell_imp.append(0)
     mcnp.calc_parameters = CalcParams(cell_imp,
-                                      PhotonSource(0, 0, detector.get_height() + source.dimensions.distance, 1),
-                                      1, [1], mcnp.materials, 100000)
+                              PhotonSource(0, 0, detector.get_height() + source.dimensions.distance, 1),
+                              1, [1], mcnp.materials, 100000)
 
+def create_mcnp_from_det(mcnp, det, source):
+    if (detector.det_type == "Coaxial"):
+        mcnp_add_hpge_det(mcnp, detector)
+    elif (detector.det_type == "Scintillator"):
+        mcnp_add_scint_det(mcnp, detector)
+    mcnp_add_source(mcnp, source, detector)
+    mcnp_add_calc_params(mcnp, detector, source)
+
+
+if __name__ == "__main__":
+    detector = din_parser.HPGeDetector.parse_from_file("mcnp_examples/Gem15P4-70_51-TP32799B_UVT_tape4.din")
+    source = sin_parser.PointSource.parse_from_file("mcnp_examples/Point-10cm.sin")
+    #print(detector)
+    form_mcnp_file("mcnp_examples/PPD_in", detector)
+    mcnp = McnpTask("COAXIAL")
+    create_mcnp_from_det(mcnp, detector, source)
     mcnp.save_to_file("mcnp_examples/PPD_test")
+    # scintillator
+    detector = din_parser.ScintDetector.parse_from_file("mcnp_examples/NaI40x40.din")
+    mcnp = McnpTask("SCINT")
+    create_mcnp_from_det(mcnp, detector, source)
+    mcnp.save_to_file("mcnp_examples/SCI_test")
