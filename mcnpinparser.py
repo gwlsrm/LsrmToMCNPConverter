@@ -118,6 +118,7 @@ class McnpTask:
         self.cells = []
         self.datacards = {}
         self.materials = []
+        self.calc_parameters = None
 
     def add_surface(self, surf_num, geom_type, *geom_parameters):
         self.surfaces.append(Surface(surf_num, geom_type, geom_parameters))

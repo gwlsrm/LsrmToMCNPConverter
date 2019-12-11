@@ -113,49 +113,6 @@ class ScintDimensions:
         return res
 
 
-class Element:
-    def __init__(self):
-        self.z = 0
-        self.mf = 0
-
-    def __repr__(self):
-        return '{' + str(self.z) + ':' + str(self.mf) + '}'
-
-    @staticmethod
-    def parse_element(parameters, material_name, num, det_type):
-        element = Element()
-        z = det_type + "_Z" + material_name + '[' + str(num) + ']'
-        element.z = int(parameters[z])
-        mf = det_type + "_Fractions" + material_name + '[' + str(num) + ']'
-        element.mf = float(parameters[mf])
-        return element
-
-
-class Material:
-    def __init__(self):
-        self.rho = 0
-        self.elements = []
-
-    def __repr__(self):
-        res = ','.join([str(e) for e in self.elements])
-        res = "{Rho=" + str(self.rho) + " elements=" + res + "}"
-        return res
-
-    @staticmethod
-    def parse_material(parameters, material_name, det_type):
-        res = Material()
-        res.rho = float(parameters[det_type + "_Ro" + material_name])
-        if material_name != "Vacuum":
-            nElements = det_type + "_n" + material_name + "Elements"
-        else:
-            nElements = det_type + "_n" + material_name
-        nElements = int(parameters[nElements])
-        for i in range(nElements):
-            element = Element.parse_element(parameters, material_name, i, det_type)
-            res.elements.append(element)
-        return res
-
-
 class HPGeDetector:
     def __init__(self):
         # dimensions
@@ -171,8 +128,7 @@ class HPGeDetector:
         return res
 
     @staticmethod
-    def parse_from_file(filename):
-        parameters = parseInDoc(filename)
+    def parse_from_parameters(parameters):
         if "DetectorType" not in parameters or parameters["DetectorType"] != "COAXIAL":
             return None
         res = HPGeDetector()
@@ -227,8 +183,7 @@ class ScintDetector:
         return res
 
     @staticmethod
-    def parse_from_file(filename):
-        parameters = parseInDoc(filename)
+    def parse_from_parameters(parameters):
         if "DetectorType" not in parameters or parameters["DetectorType"] != "SCINTILLATOR":
             return None
         res = ScintDetector()
@@ -270,9 +225,18 @@ class ScintDetector:
         return self.bottom_surf_num
 
 
+def parseDetFromIn(filename):
+    parameters = parseInDoc(filename)
+    if "DetectorType" not in parameters:
+        return None
+    if parameters["DetectorType"] == "COAXIAL":
+        return HPGeDetector.parse_from_parameters(parameters)
+    if parameters["DetectorType"] == "SCINTILLATOR":
+        return ScintDetector.parse_from_parameters(parameters)
+
 if __name__ == "__main__":
-    detector = HPGeDetector.parse_from_file("mcnp_examples/Gem15P4-70_51-TP32799B_UVT_tape4.din")
+    detector = parseDetFromIn("mcnp_examples/Gem15P4-70_51-TP32799B_UVT_tape4.din")
     print(detector)
     print()
-    detector = ScintDetector.parse_from_file("mcnp_examples/NaI40x40.din")
+    detector = parseDetFromIn("mcnp_examples/NaI40x40.din")
     print(detector)

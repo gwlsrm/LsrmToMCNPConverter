@@ -11,6 +11,7 @@ ENERGY = 1
 AIR_MAT = [Element(7, 0.755), Element(8, 0.2315), Element(18, 0.0129)]
 AIR_RHO = 0.001
 
+
 def write_det_layers_to_file(f, det):
     rho_cryst = det.materials["Crystal"].rho
     rho_cr_clad = det.materials["CrystalSideCladding"].rho
@@ -217,7 +218,7 @@ def mcnp_add_calc_params(mcnp, detector, source):
                               PhotonSource(0, 0, detector.get_height() + source.dimensions.distance, 1),
                               1, [1], mcnp.materials, 100000)
 
-def create_mcnp_from_det(mcnp, det, source):
+def create_mcnp_from_lsrm(mcnp, det, source):
     if (detector.det_type == "Coaxial"):
         mcnp_add_hpge_det(mcnp, detector)
     elif (detector.det_type == "Scintillator"):
@@ -227,15 +228,15 @@ def create_mcnp_from_det(mcnp, det, source):
 
 
 if __name__ == "__main__":
-    detector = din_parser.HPGeDetector.parse_from_file("mcnp_examples/Gem15P4-70_51-TP32799B_UVT_tape4.din")
-    source = sin_parser.PointSource.parse_from_file("mcnp_examples/Point-10cm.sin")
-    #print(detector)
-    form_mcnp_file("mcnp_examples/PPD_in", detector)
+    # coaxial detector
+    detector = din_parser.parseDetFromIn("mcnp_examples/Gem15P4-70_51-TP32799B_UVT_tape4.din")
+    source = sin_parser.parseSourceFromIn("mcnp_examples/Point-10cm.sin")
+    #form_mcnp_file("mcnp_examples/PPD_in", detector) # old style
     mcnp = McnpTask("COAXIAL")
-    create_mcnp_from_det(mcnp, detector, source)
+    create_mcnp_from_lsrm(mcnp, detector, source)
     mcnp.save_to_file("mcnp_examples/PPD_test")
     # scintillator
-    detector = din_parser.ScintDetector.parse_from_file("mcnp_examples/NaI40x40.din")
+    detector = din_parser.parseDetFromIn("mcnp_examples/NaI40x40.din")
     mcnp = McnpTask("SCINT")
-    create_mcnp_from_det(mcnp, detector, source)
+    create_mcnp_from_lsrm(mcnp, detector, source)
     mcnp.save_to_file("mcnp_examples/SCI_test")
