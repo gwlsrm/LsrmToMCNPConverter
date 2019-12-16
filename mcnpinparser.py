@@ -81,8 +81,26 @@ class PhotonSource:
         self.z = z
         self.energy = energy
 
+
+class PhotonPointSource(PhotonSource):
+    def __init__(self, x, y, z, energy):
+        PhotonSource.__init__(self, x, y, z, energy)
+
     def __repr__(self):
         return "SDEF  POS=%g %g %g ERG=%g PAR=2" % (self.x, self.y, self.z, self.energy)
+
+
+class CylPhotonSource(PhotonSource):
+    def __init__(self, x, y, z, energy, height, radius):
+        PhotonSource.__init__(self, x, y, z, energy)
+        self.height = height
+        self.radius = radius
+
+    def __repr__(self):
+        str = "SDEF  POS=%g %g %g ERG=%g PAR=2 RAD=D2 EXT=D3 AXS=0 0 1\n" % (self.x, self.y, self.z, self.energy)
+        str += f"SI2 {self.radius}\n"
+        str += f"SI3 {self.height}"
+        return str
 
 
 class CalcParams:

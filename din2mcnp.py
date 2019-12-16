@@ -54,50 +54,6 @@ def write_det_surf_to_file(f, det):
     f.write("16    CZ %g\n" % (radius))
     return thick
 
-def form_mcnp_file(filename, det):
-    with open(filename, 'w') as f:
-        f.write("COAXIAL\n")
-
-        # layers
-        # detector
-        write_det_layers_to_file(f, det)
-
-        # source
-        f.write("9     6 -0.001 9 -16 -17\n")                                # air between detector and source
-        #universe
-        f.write("10    0      -18 : 16 : 17\n")                              # universe
-        f.write("\n")
-
-        # surfaces
-        # detector
-        thick = write_det_surf_to_file(f, det)
-
-        #sources
-        f.write("17    PZ %g\n" % (thick + SOURCE_DIST + 0.05))
-        f.write("18    PZ 0\n")
-        f.write("\n")
-
-        # calculation parameters
-        f.write("MODE  P\n")
-        f.write("IMP:P 1 1 1 1 1 1 1 1 1 0\n")
-        f.write("SDEF  POS=0 0 %g ERG=%g PAR=2\n" % (thick + SOURCE_DIST, ENERGY))
-        f.write("F8:P  1\n")
-        f.write("E0    0 %g %g\n" % (ENERGY - 0.001, ENERGY + 0.001))
-
-        # materials
-        # detector
-        f.write("M1    32000 1\n")  # crystal
-        f.write("M2    13000 1\n")  # crystal cladding
-        f.write("M3    7000 1\n")   # vacuum
-        f.write("M4    13000 1\n")  # crystal mounting
-        f.write("M5    13000 1\n")  # detector cap
-
-        # source
-        f.write("M6    7000 1\n")  # air
-
-        # history number (counts)
-        f.write("NPS   100000\n")
-
 def mcnp_add_hpge_det(mcnp, det):
     # add planes
     thick = det.dimensions.detector_cap_back_thickness
@@ -198,7 +154,7 @@ def mcnp_add_scint_det(mcnp, det):
     mcnp.add_material(5, det.materials["DetectorCap"].elements)
 
 
-def mcnp_add_source(mcnp, source, det):
+def mcnp_add_point_source(mcnp, source, det):
     # surfaces
     sn = len(mcnp.surfaces)+1
     mcnp.add_surface(sn, "PZ", det.get_height() + source.dimensions.distance + 0.05)
@@ -211,32 +167,89 @@ def mcnp_add_source(mcnp, source, det):
     # universe
     mcnp.add_cell(cn+1, 0, 0, "-%d : %d : %d" % (det.get_bottom_surf_num(), det.get_cyl_surf_num(), sn))
 
+
+def mcnp_add_cyl_source(mcnp, source, det):
+    # surfaces
+    sn = len(mcnp.surfaces)
+    height = det.get_height() + source.dimensions.distance
+    mcnp.add_surface(sn+1, "PZ", height)
+    height += source.dimensions.beaker_end_wall_thickness
+    mcnp.add_surface(sn+2, "PZ", height)
+    height += source.dimensions.source_height
+    mcnp.add_surface(sn+3, "PZ", height)
+    height = det.get_height() + source.dimensions.distance + source.dimensions.beaker_height
+    mcnp.add_surface(sn+4, "PZ", height - source.dimensions.beaker_side_wall_thickness)
+    mcnp.add_surface(sn+5, "PZ", height)
+    radius = source.dimensions.beaker_diameter / 2
+    mcnp.add_surface(sn+6, "CZ", radius - source.dimensions.beaker_side_wall_thickness)
+    mcnp.add_surface(sn+7, "CZ", radius)
+    # cells
+    cn = len(mcnp.cells)
+    mn = len(mcnp.materials)
+    rho_wall = source.materials["Wall"].rho
+    rho_source = source.materials["Source"].rho
+    rho_empty = source.materials["EmptySpace"].rho
+    mcnp.add_cell(cn, mn+1, rho_source, f"{sn+2} -{sn+6} -{sn+3}") # source
+    mcnp.add_cell(cn, mn+2, rho_empty, f"{sn+3} -{sn+6} -{sn+4}")  # empty space
+    mcnp.add_cell(cn, mn+3, rho_wall, f"{sn+1} -{sn+7} -{sn+5} ({sn+4} : {sn+6} : -{sn+2})")  # beaker
+    mcnp.materials.append(Material(mn+1, source.materials["Source"].elements))
+    mcnp.materials.append(Material(mn+2, source.materials["EmptySpace"].elements))
+    mcnp.materials.append(Material(mn+3, source.materials["Wall"].elements))
+    # air && universe
+    if (radius <= det.get_radius):
+        # air
+        mcnp.add_cell(cn, mn+4, AIR_RHO,
+              f"{det.get_top_surf_num()} -{det.get_cyl_surf_num()} -{sn+5} ({sn+7} : -{sn+1})")
+        # universe
+        mcnp.add_cell(cn, 0, 0,
+              f"-0 : {det.get_cyl_surf_num()} : {sn+5}")
+    else:
+        # air
+        mcnp.add_cell(cn, mn+4, AIR_RHO,
+              f"0 -{sn+7} -{sn+1} ({det.get_top_surf_num()} : {det.get_cyl_surf_num()})")
+        # universe
+        mcnp.add_cell(cn, 0, 0,
+              f"-0 : {sn+7} : {sn+5}")
+    # air
+    mcnp.materials.append(Material(mn, AIR_MAT))
+    # universe
+    mcnp.add_cell(cn+1, 0, 0, "-%d : %d : %d" % (det.get_bottom_surf_num(), det.get_cyl_surf_num(), sn))
+
 def mcnp_add_calc_params(mcnp, detector, source):
     cell_imp = [1] * (len(mcnp.cells) - 1)
     cell_imp.append(0)
-    mcnp.calc_parameters = CalcParams(cell_imp,
-                              PhotonSource(0, 0, detector.get_height() + source.dimensions.distance, 1),
-                              1, [1], mcnp.materials, 100000)
+    if source.source_type == "Point":
+        photon_source = PhotonPointSource(0, 0, detector.get_height() + source.dimensions.distance, 1)
+    elif source.source_type == "Cylinder":
+        photon_source = CylPhotonSource(0, 0, detector.get_height() + source.dimensions.distance, 1,
+                                        source.get_source_radius(), source.get_source_height())
+    else:
+        photon_source = None
+    mcnp.calc_parameters = CalcParams(cell_imp, photon_source, 1, [1], mcnp.materials, 100000)
 
-def create_mcnp_from_lsrm(mcnp, det, source):
-    if (detector.det_type == "Coaxial"):
-        mcnp_add_hpge_det(mcnp, detector)
-    elif (detector.det_type == "Scintillator"):
-        mcnp_add_scint_det(mcnp, detector)
-    mcnp_add_source(mcnp, source, detector)
-    mcnp_add_calc_params(mcnp, detector, source)
+def create_mcnp_from_lsrm(mcnp_task, det, source):
+    mcnp = McnpTask(mcnp_task)
+    if (det.det_type == "Coaxial"):
+        mcnp_add_hpge_det(mcnp, det)
+    elif (det.det_type == "Scintillator"):
+        mcnp_add_scint_det(mcnp, det)
+    mcnp_add_point_source(mcnp, source, det)
+    mcnp_add_calc_params(mcnp, det, source)
+    return mcnp
 
 
 if __name__ == "__main__":
-    # coaxial detector
-    detector = din_parser.parseDetFromIn("mcnp_examples/Gem15P4-70_51-TP32799B_UVT_tape4.din")
-    source = sin_parser.parseSourceFromIn("mcnp_examples/Point-10cm.sin")
-    #form_mcnp_file("mcnp_examples/PPD_in", detector) # old style
-    mcnp = McnpTask("COAXIAL")
-    create_mcnp_from_lsrm(mcnp, detector, source)
+    # coaxial detector + point
+    hpge_detector = din_parser.parseDetFromIn("mcnp_examples/Gem15P4-70_51-TP32799B_UVT_tape4.din")
+    point_source = sin_parser.parseSourceFromIn("mcnp_examples/Point-10cm.sin")
+    mcnp = create_mcnp_from_lsrm("COAXIAL", hpge_detector, point_source)
     mcnp.save_to_file("mcnp_examples/PPD_test")
-    # scintillator
-    detector = din_parser.parseDetFromIn("mcnp_examples/NaI40x40.din")
-    mcnp = McnpTask("SCINT")
-    create_mcnp_from_lsrm(mcnp, detector, source)
+    # scintillator + point
+    scint_detector = din_parser.parseDetFromIn("mcnp_examples/NaI40x40.din")
+    mcnp = create_mcnp_from_lsrm("SCINT", scint_detector, point_source)
     mcnp.save_to_file("mcnp_examples/SCI_test")
+    # coaxial + cylinder
+    cyl_source = sin_parser.parseSourceFromIn("mcnp_examples/Petri-80ml.sin")
+    mcnp = create_mcnp_from_lsrm("COA_POI", hpge_detector, cyl_source)
+    mcnp.save_to_file("mcnp_examples/PPD_cyl")
+
