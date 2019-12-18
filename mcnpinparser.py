@@ -91,10 +91,10 @@ class PhotonPointSource(PhotonSource):
 
 
 class CylPhotonSource(PhotonSource):
-    def __init__(self, x, y, z, energy, height, radius):
+    def __init__(self, x, y, z, energy, radius, height):
         PhotonSource.__init__(self, x, y, z, energy)
-        self.height = height
         self.radius = radius
+        self.height = height
 
     def __repr__(self):
         str = "SDEF  POS=%g %g %g ERG=%g PAR=2 RAD=D2 EXT=D3 AXS=0 0 1\n" % (self.x, self.y, self.z, self.energy)
@@ -144,10 +144,8 @@ class McnpTask:
     def add_cell(self, cell_num, mat_num, density, equation):
         self.cells.append(Cell(cell_num, mat_num, density, equation))
 
-    def add_material(self, mat_num, elements):
-        self.materials.append(Material(mat_num, []))
-        for e in elements:
-            self.materials[-1].elements.append(Element(e.z, e.mf))
+    def add_material(self, material):
+        self.materials.append(material)
 
     @staticmethod
     def parse_from_in_file(filename):

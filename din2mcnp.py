@@ -8,9 +8,14 @@ from mcnpinparser import *
 
 SOURCE_DIST = 10
 ENERGY = 1
-AIR_MAT = [Element(7, 0.755), Element(8, 0.2315), Element(18, 0.0129)]
+AIR_MAT = [Element(7, 0.7554), Element(8, 0.2316), Element(18, 0.0129)]
 AIR_RHO = 0.001
 
+def din_mat_to_mcnp(mat_num, material):
+    elements = []
+    for e in material.elements:
+        elements.append(Element(e.z, e.mf))
+    return Material(mat_num, elements)
 
 def write_det_layers_to_file(f, det):
     rho_cryst = det.materials["Crystal"].rho
@@ -100,11 +105,11 @@ def mcnp_add_hpge_det(mcnp, det):
     mcnp.add_cell(7, 4, rho_cr_mount, "1 -2 -14")  # Detector mounting
     mcnp.add_cell(8, 5, rho_det_cap, "17 -16 -9 ( -1 : 15 : 8 )")  # Detector cap
     # add materials
-    mcnp.add_material(1, det.materials["Crystal"].elements)
-    mcnp.add_material(2, det.materials["CrystalSideCladding"].elements)
-    mcnp.add_material(3, det.materials["Vacuum"].elements)
-    mcnp.add_material(4, det.materials["CrystalMounting"].elements)
-    mcnp.add_material(5, det.materials["DetectorCap"].elements)
+    mcnp.add_material(din_mat_to_mcnp(1, det.materials["Crystal"]))
+    mcnp.add_material(din_mat_to_mcnp(2, det.materials["CrystalSideCladding"]))
+    mcnp.add_material(din_mat_to_mcnp(3, det.materials["Vacuum"]))
+    mcnp.add_material(din_mat_to_mcnp(4, det.materials["CrystalMounting"]))
+    mcnp.add_material(din_mat_to_mcnp(5, det.materials["DetectorCap"]))
 
 def mcnp_add_scint_det(mcnp, det):
     # add planes
@@ -147,11 +152,11 @@ def mcnp_add_scint_det(mcnp, det):
     mcnp.add_cell(4, 2, rho_det_pack, "1 -5 -10 ( 4 : 9 )")  # Packaging
     mcnp.add_cell(5, 3, rho_det_cap, "12 -6 -11 ( -1 : 5 : 10 )")  # Cap
     # add materials
-    mcnp.add_material(1, det.materials["Crystal"].elements)
-    mcnp.add_material(2, det.materials["CrystalCladding"].elements)
-    mcnp.add_material(3, det.materials["CrystalReflector"].elements)
-    mcnp.add_material(4, det.materials["DetectorPackaging"].elements)
-    mcnp.add_material(5, det.materials["DetectorCap"].elements)
+    mcnp.add_material(din_mat_to_mcnp(1, det.materials["Crystal"]))
+    mcnp.add_material(din_mat_to_mcnp(2, det.materials["CrystalCladding"]))
+    mcnp.add_material(din_mat_to_mcnp(3, det.materials["CrystalReflector"]))
+    mcnp.add_material(din_mat_to_mcnp(4, det.materials["DetectorPackaging"]))
+    mcnp.add_material(din_mat_to_mcnp(5, det.materials["DetectorCap"]))
 
 
 def mcnp_add_point_source(mcnp, source, det):
@@ -163,7 +168,7 @@ def mcnp_add_point_source(mcnp, source, det):
     mn = len(mcnp.materials)+1
     # air
     mcnp.add_cell(cn, mn, AIR_RHO, "%d -%d -%d" % (det.get_top_surf_num(), det.get_cyl_surf_num(), sn))
-    mcnp.materials.append(Material(mn, AIR_MAT))
+    mcnp.add_material(Material(mn, AIR_MAT))
     # universe
     mcnp.add_cell(cn+1, 0, 0, "-%d : %d : %d" % (det.get_bottom_surf_num(), det.get_cyl_surf_num(), sn))
 
@@ -189,43 +194,44 @@ def mcnp_add_cyl_source(mcnp, source, det):
     rho_wall = source.materials["Wall"].rho
     rho_source = source.materials["Source"].rho
     rho_empty = source.materials["EmptySpace"].rho
-    mcnp.add_cell(cn, mn+1, rho_source, f"{sn+2} -{sn+6} -{sn+3}") # source
-    mcnp.add_cell(cn, mn+2, rho_empty, f"{sn+3} -{sn+6} -{sn+4}")  # empty space
-    mcnp.add_cell(cn, mn+3, rho_wall, f"{sn+1} -{sn+7} -{sn+5} ({sn+4} : {sn+6} : -{sn+2})")  # beaker
-    mcnp.materials.append(Material(mn+1, source.materials["Source"].elements))
-    mcnp.materials.append(Material(mn+2, source.materials["EmptySpace"].elements))
-    mcnp.materials.append(Material(mn+3, source.materials["Wall"].elements))
+    mcnp.add_cell(cn+1, mn+1, rho_source, f"{sn+2} -{sn+6} -{sn+3}") # source
+    mcnp.add_cell(cn+2, mn+2, rho_empty, f"{sn+3} -{sn+6} -{sn+4}")  # empty space
+    mcnp.add_cell(cn+3, mn+3, rho_wall, f"{sn+1} -{sn+7} -{sn+5} ({sn+4} : {sn+6} : -{sn+2})")  # beaker
+    mcnp.add_material(din_mat_to_mcnp(mn+1, source.materials["Source"]))
+    mcnp.add_material(din_mat_to_mcnp(mn+2, source.materials["EmptySpace"]))
+    mcnp.add_material(din_mat_to_mcnp(mn+3, source.materials["Wall"]))
     # air && universe
-    if (radius <= det.get_radius):
+    if (radius <= det.get_radius()):
         # air
-        mcnp.add_cell(cn, mn+4, AIR_RHO,
+        mcnp.add_cell(cn+4, mn+4, AIR_RHO,
               f"{det.get_top_surf_num()} -{det.get_cyl_surf_num()} -{sn+5} ({sn+7} : -{sn+1})")
         # universe
-        mcnp.add_cell(cn, 0, 0,
-              f"-0 : {det.get_cyl_surf_num()} : {sn+5}")
+        mcnp.add_cell(cn+5, 0, 0,
+              f"-{det.get_bottom_surf_num()} : {det.get_cyl_surf_num()} : {sn+5}")
     else:
         # air
-        mcnp.add_cell(cn, mn+4, AIR_RHO,
-              f"0 -{sn+7} -{sn+1} ({det.get_top_surf_num()} : {det.get_cyl_surf_num()})")
+        mcnp.add_cell(cn+4, mn+4, AIR_RHO,
+              f"{det.get_bottom_surf_num()} -{sn+7} -{sn+1} ({det.get_top_surf_num()} : {det.get_cyl_surf_num()})")
         # universe
-        mcnp.add_cell(cn, 0, 0,
-              f"-0 : {sn+7} : {sn+5}")
+        mcnp.add_cell(cn+5, 0, 0,
+              f"-{det.get_bottom_surf_num()} : {sn+7} : {sn+5}")
     # air
-    mcnp.materials.append(Material(mn, AIR_MAT))
-    # universe
-    mcnp.add_cell(cn+1, 0, 0, "-%d : %d : %d" % (det.get_bottom_surf_num(), det.get_cyl_surf_num(), sn))
+    mcnp.add_material(Material(mn+4, AIR_MAT))
 
 def mcnp_add_calc_params(mcnp, detector, source):
+    energy = 1
+    MPS = 10000000
     cell_imp = [1] * (len(mcnp.cells) - 1)
     cell_imp.append(0)
     if source.source_type == "Point":
-        photon_source = PhotonPointSource(0, 0, detector.get_height() + source.dimensions.distance, 1)
+        photon_source = PhotonPointSource(0, 0, detector.get_height() + source.dimensions.distance, energy)
     elif source.source_type == "Cylinder":
-        photon_source = CylPhotonSource(0, 0, detector.get_height() + source.dimensions.distance, 1,
-                                        source.get_source_radius(), source.get_source_height())
+        photon_source = CylPhotonSource(0, 0, detector.get_height() + source.dimensions.distance
+                                        + source.get_source_center_from_beaker_bottom(), energy,
+                                        source.get_source_radius(), source.get_source_height() / 2)
     else:
         photon_source = None
-    mcnp.calc_parameters = CalcParams(cell_imp, photon_source, 1, [1], mcnp.materials, 100000)
+    mcnp.calc_parameters = CalcParams(cell_imp, photon_source, 1, [1], mcnp.materials, MPS)
 
 def create_mcnp_from_lsrm(mcnp_task, det, source):
     mcnp = McnpTask(mcnp_task)
@@ -233,7 +239,12 @@ def create_mcnp_from_lsrm(mcnp_task, det, source):
         mcnp_add_hpge_det(mcnp, det)
     elif (det.det_type == "Scintillator"):
         mcnp_add_scint_det(mcnp, det)
-    mcnp_add_point_source(mcnp, source, det)
+    if source.source_type == "Point":
+        mcnp_add_point_source(mcnp, source, det)
+    elif source.source_type == "Cylinder":
+        mcnp_add_cyl_source(mcnp, source, det)
+    else:
+        pass
     mcnp_add_calc_params(mcnp, det, source)
     return mcnp
 
@@ -242,14 +253,14 @@ if __name__ == "__main__":
     # coaxial detector + point
     hpge_detector = din_parser.parseDetFromIn("mcnp_examples/Gem15P4-70_51-TP32799B_UVT_tape4.din")
     point_source = sin_parser.parseSourceFromIn("mcnp_examples/Point-10cm.sin")
-    mcnp = create_mcnp_from_lsrm("COAXIAL", hpge_detector, point_source)
-    mcnp.save_to_file("mcnp_examples/PPD_test")
+    mcnp = create_mcnp_from_lsrm("COA_POI", hpge_detector, point_source)
+    mcnp.save_to_file("mcnp_examples/PP")
     # scintillator + point
     scint_detector = din_parser.parseDetFromIn("mcnp_examples/NaI40x40.din")
-    mcnp = create_mcnp_from_lsrm("SCINT", scint_detector, point_source)
-    mcnp.save_to_file("mcnp_examples/SCI_test")
+    mcnp = create_mcnp_from_lsrm("SCINT_POI", scint_detector, point_source)
+    mcnp.save_to_file("mcnp_examples/SP")
     # coaxial + cylinder
-    cyl_source = sin_parser.parseSourceFromIn("mcnp_examples/Petri-80ml.sin")
-    mcnp = create_mcnp_from_lsrm("COA_POI", hpge_detector, cyl_source)
-    mcnp.save_to_file("mcnp_examples/PPD_cyl")
+    cyl_source = sin_parser.parseSourceFromIn("mcnp_examples/Petri-80ml_1.sin")
+    mcnp = create_mcnp_from_lsrm("COA_CYL", hpge_detector, cyl_source)
+    mcnp.save_to_file("mcnp_examples/PC")
 

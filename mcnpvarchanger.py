@@ -52,7 +52,7 @@ def change_in_file(fname, fname_out, varname, varvalue):
 
 if __name__ == "__main__":
     if len(sys.argv) < 5:
-        sys.exit
+        sys.exit()
     fname = sys.argv[1]
     fname_out = sys.argv[2]
     varname = []

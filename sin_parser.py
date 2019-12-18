@@ -134,6 +134,9 @@ class CylSource:
     def get_source_height(self):
         return self.dimensions.source_height
 
+    def get_source_center_from_beaker_bottom(self):
+        return self.dimensions.beaker_end_wall_thickness + self.get_source_height() / 2
+
     @staticmethod
     def parse_from_parameters(parameters):
         if "SourceType" not in parameters or parameters["SourceType"] != "CYLINDER":
