@@ -14,7 +14,7 @@ def get_out_fname(fname, cnt):
     return fname + str(cnt)
 
 def get_enrange_str(energy):
-    return f"0 0.001 {energy-0.001} {energy} {energy+0.001}"
+    return f"0 0.001 {energy-0.001} {energy+0.001}"
 
 if __name__ == "__main__":
     if len(sys.argv) < 3:
