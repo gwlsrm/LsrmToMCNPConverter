@@ -1,3 +1,4 @@
+#!/usr/bin/python3
 """
     Converts lsrm-detector (e.g. from din-files) to MCNP in-files
 """
@@ -159,18 +160,86 @@ def mcnp_add_scint_det(mcnp, det):
     mcnp.add_material(din_mat_to_mcnp(5, det.materials["DetectorCap"]))
 
 
+def mcnp_add_coaxwell_det(mcnp, det):
+    # add planes
+    thick = det.dimensions.detector_cap_back_thickness
+    mcnp.add_surface(1, "PZ", thick)
+    thick += det.dimensions.detector_mounting_thickness
+    mcnp.add_surface(2, "PZ", thick)
+    mcnp.add_surface(3, "PZ", thick + det.dimensions.crystal_back_dl)
+    thick += det.dimensions.crystal_height
+    mcnp.add_surface(4, "PZ", thick - det.dimensions.crystal_hole_height - det.dimensions.crystal_hole_bottom_dl)
+    mcnp.add_surface(5, "PZ", thick - det.dimensions.crystal_hole_height)
+    cap_thick = thick + det.dimensions.cap_to_crystal_distance + det.dimensions.detector_cap_front_thickness
+    mcnp.add_surface(6, "PZ", cap_thick - det.dimensions.detector_cap_hole_height - det.dimensions.detector_cap_hole_bottom_thickness)
+    mcnp.add_surface(7, "PZ", cap_thick - det.dimensions.detector_cap_hole_height)
+    mcnp.add_surface(8, "PZ", thick - det.dimensions.crystal_front_dl)
+    mcnp.add_surface(9, "PZ", thick)
+    mcnp.add_surface(10, "PZ", cap_thick - det.dimensions.detector_cap_front_thickness)
+    mcnp.add_surface(11, "PZ", cap_thick)
+    # add cylinders
+    radius = det.dimensions.detector_cap_hole_diameter / 2.0
+    mcnp.add_surface(12, "CZ", radius)
+    mcnp.add_surface(13, "CZ", radius + det.dimensions.detector_cap_hole_side_thickness)
+    radius = det.dimensions.crystal_hole_diameter / 2.0
+    mcnp.add_surface(14, "CZ", radius)
+    mcnp.add_surface(15, "CZ", radius + det.dimensions.crystal_hole_side_dl)
+    radius = det.dimensions.crystal_diameter / 2.0
+    mcnp.add_surface(16, "CZ", radius - det.dimensions.crystal_side_dl)
+    mcnp.add_surface(17, "CZ", radius)
+    mcnp.add_surface(18, "CZ", radius + det.dimensions.crystal_side_cladding_thickness)
+    radius = det.dimensions.detector_cap_diameter / 2.0
+    mcnp.add_surface(19, "CZ", radius - det.dimensions.detector_cap_side_thickness)
+    mcnp.add_surface(20, "CZ", radius)
+    mcnp.add_surface(21, "PZ", 0)
+    det.set_top_surf_num(11)
+    det.set_cyl_surf_num(20)
+    det.set_hole_top_surf_num(7)
+    det.set_hole_cyl_surf_num(12)
+    det.set_bottom_surf_num(21)
+    # add cells
+    rho_cryst = det.materials["Crystal"].rho
+    rho_cr_clad = det.materials["CrystalSideCladding"].rho
+    rho_vacuum = det.materials["Vacuum"].rho
+    rho_cr_mount = det.materials["CrystalMounting"].rho
+    rho_det_cap = det.materials["DetectorCap"].rho
+    mcnp.add_cell(1, 1, rho_cryst, "-16 3 -8 (15 : -4)")
+    mcnp.add_cell(2, 1, rho_cryst, "2 -17 -9 (-3 : 16 : (8 15))")  # deadlayer 1
+    mcnp.add_cell(3, 1, rho_cryst, "-15 4 -9 (-5 : 14)")  # deadlayer 2
+    mcnp.add_cell(4, 2, rho_cr_clad, "2 -9 -18 17")  # crystal cladding
+    mcnp.add_cell(5, 3, rho_vacuum, "5 -14 -9 (-6 : 13)")  # hole
+    mcnp.add_cell(6, 3, rho_vacuum, "-19 1 -10 (18 : (9 13))")  # vacuum chamber
+    mcnp.add_cell(7, 4, rho_cr_mount, "1 -2 -18")  # Detector mounting
+    mcnp.add_cell(8, 5, rho_det_cap, "0 -11 -20 (-1 : 19 : (10 13))")  # Detector cap
+    mcnp.add_cell(9, 5, rho_det_cap, "6 -13 -11 (-7 : 12)")  # Detector cap hole wall
+    # add materials
+    mcnp.add_material(din_mat_to_mcnp(1, det.materials["Crystal"]))
+    mcnp.add_material(din_mat_to_mcnp(2, det.materials["CrystalSideCladding"]))
+    mcnp.add_material(din_mat_to_mcnp(3, det.materials["Vacuum"]))
+    mcnp.add_material(din_mat_to_mcnp(4, det.materials["CrystalMounting"]))
+    mcnp.add_material(din_mat_to_mcnp(5, det.materials["DetectorCap"]))
+
+
 def mcnp_add_point_source(mcnp, source, det):
-    # surfaces
-    sn = len(mcnp.surfaces)+1
-    mcnp.add_surface(sn, "PZ", det.get_height() + source.dimensions.distance + 0.05)
-    # cells
-    cn = len(mcnp.cells)+1
-    mn = len(mcnp.materials)+1
-    # air
-    mcnp.add_cell(cn, mn, AIR_RHO, "%d -%d -%d" % (det.get_top_surf_num(), det.get_cyl_surf_num(), sn))
-    mcnp.add_material(Material(mn, AIR_MAT))
-    # universe
-    mcnp.add_cell(cn+1, 0, 0, "-%d : %d : %d" % (det.get_bottom_surf_num(), det.get_cyl_surf_num(), sn))
+    sn = len(mcnp.surfaces) + 1
+    cn = len(mcnp.cells) + 1
+    mn = len(mcnp.materials) + 1
+    if (det.det_type != "CoaxWell"):
+        # surfaces
+        mcnp.add_surface(sn, "PZ", det.get_height() + source.dimensions.distance + 0.05)
+        # cells
+        # air
+        mcnp.add_cell(cn, mn, AIR_RHO, "%d -%d -%d" % (det.get_top_surf_num(), det.get_cyl_surf_num(), sn))
+        mcnp.add_material(Material(mn, AIR_MAT))
+        # universe
+        mcnp.add_cell(cn+1, 0, 0, "-%d : %d : %d" % (det.get_bottom_surf_num(), det.get_cyl_surf_num(), sn))
+    else:
+        # cells
+        # air
+        mcnp.add_cell(cn, mn, AIR_RHO, "%d -%d -%d" % (det.get_hole_top_surf_num(), det.get_hole_cyl_surf_num(), det.get_top_surf_num()))
+        mcnp.add_material(Material(mn, AIR_MAT))
+        # universe
+        mcnp.add_cell(cn + 1, 0, 0, "-%d : %d : %d" % (det.get_bottom_surf_num(), det.get_top_surf_num(), det.get_cyl_surf_num()))
 
 
 def mcnp_add_cyl_source(mcnp, source, det):
@@ -223,10 +292,13 @@ def mcnp_add_calc_params(mcnp, detector, source):
     MPS = 10000000
     cell_imp = [1] * (len(mcnp.cells) - 1)
     cell_imp.append(0)
+    det_front = detector.get_height()
+    if detector.det_type == "CoaxWell":
+        det_front -= detector.dimensions.detector_cap_hole_height
     if source.source_type == "Point":
-        photon_source = PhotonPointSource(0, 0, detector.get_height() + source.dimensions.distance, energy)
+        photon_source = PhotonPointSource(0, 0, det_front + source.dimensions.distance, energy)
     elif source.source_type == "Cylinder":
-        photon_source = CylPhotonSource(0, 0, detector.get_height() + source.dimensions.distance
+        photon_source = CylPhotonSource(0, 0, det_front + source.dimensions.distance
                                         + source.get_source_center_from_beaker_bottom(), energy,
                                         source.get_source_radius(), source.get_source_height() / 2)
     else:
@@ -235,10 +307,12 @@ def mcnp_add_calc_params(mcnp, detector, source):
 
 def create_mcnp_from_lsrm(mcnp_task, det, source):
     mcnp = McnpTask(mcnp_task)
-    if (det.det_type == "Coaxial"):
+    if det.det_type == "Coaxial":
         mcnp_add_hpge_det(mcnp, det)
-    elif (det.det_type == "Scintillator"):
+    elif det.det_type == "Scintillator":
         mcnp_add_scint_det(mcnp, det)
+    elif det.det_type == "CoaxWell":
+        mcnp_add_coaxwell_det(mcnp, det)
     if source.source_type == "Point":
         mcnp_add_point_source(mcnp, source, det)
     elif source.source_type == "Cylinder":
@@ -248,8 +322,7 @@ def create_mcnp_from_lsrm(mcnp_task, det, source):
     mcnp_add_calc_params(mcnp, det, source)
     return mcnp
 
-
-if __name__ == "__main__":
+def Example():
     # coaxial detector + point
     hpge_detector = din_parser.parseDetFromIn("mcnp_examples/Gem15P4-70_51-TP32799B_UVT_tape4.din")
     point_source = sin_parser.parseSourceFromIn("mcnp_examples/Point-10cm.sin")
@@ -263,4 +336,12 @@ if __name__ == "__main__":
     cyl_source = sin_parser.parseSourceFromIn("mcnp_examples/Petri-80ml_1.sin")
     mcnp = create_mcnp_from_lsrm("COA_CYL", hpge_detector, cyl_source)
     mcnp.save_to_file("mcnp_examples/PC")
+    # coaxial well detector + point
+    well_detector = din_parser.parseDetFromIn("mcnp_examples/Well.din")
+    point_source = sin_parser.parseSourceFromIn("mcnp_examples/Point-1cm.sin")
+    mcnp = create_mcnp_from_lsrm("WELL_POI", well_detector, point_source)
+    mcnp.save_to_file("mcnp_examples/WP")
 
+
+if __name__ == "__main__":
+    Example()
