@@ -3,6 +3,7 @@
     Converts lsrm-detector (e.g. from din-files) to MCNP in-files
 """
 
+import sys
 import din_parser
 import sin_parser
 from mcnpinparser import *
@@ -210,7 +211,7 @@ def mcnp_add_coaxwell_det(mcnp, det):
     mcnp.add_cell(5, 3, rho_vacuum, "5 -14 -9 (-6 : 13)")  # hole
     mcnp.add_cell(6, 3, rho_vacuum, "-19 1 -10 (18 : (9 13))")  # vacuum chamber
     mcnp.add_cell(7, 4, rho_cr_mount, "1 -2 -18")  # Detector mounting
-    mcnp.add_cell(8, 5, rho_det_cap, "0 -11 -20 (-1 : 19 : (10 13))")  # Detector cap
+    mcnp.add_cell(8, 5, rho_det_cap, "21 -11 -20 (-1 : 19 : (10 13))")  # Detector cap
     mcnp.add_cell(9, 5, rho_det_cap, "6 -13 -11 (-7 : 12)")  # Detector cap hole wall
     # add materials
     mcnp.add_material(din_mat_to_mcnp(1, det.materials["Crystal"]))
@@ -325,7 +326,7 @@ def create_mcnp_from_lsrm(mcnp_task, det, source):
 def Example():
     # coaxial detector + point
     hpge_detector = din_parser.parseDetFromIn("mcnp_examples/Gem15P4-70_51-TP32799B_UVT_tape4.din")
-    point_source = sin_parser.parseSourceFromIn("mcnp_examples/Point-10cm.sin")
+    point_source = sin_parser.parseSourceFromIn("mcnp_examples/Point-25cm.sin")
     mcnp = create_mcnp_from_lsrm("COA_POI", hpge_detector, point_source)
     mcnp.save_to_file("mcnp_examples/PP")
     # scintillator + point
@@ -344,4 +345,13 @@ def Example():
 
 
 if __name__ == "__main__":
-    Example()
+    if len(sys.argv) < 3:
+        Example()
+        sys.exit()
+    din_filename = sys.argv[1]
+    sin_filename = sys.argv[2]
+    hpge_detector = din_parser.parseDetFromIn(din_filename)
+    point_source = sin_parser.parseSourceFromIn(sin_filename)
+    mcnp = create_mcnp_from_lsrm("LSRM", hpge_detector, point_source)
+    mcnp.save_to_file("INP")
+
